@@ -1,0 +1,493 @@
+#include <OneWire.h>
+#include <DallasTemperature.h> 
+#define  ONE_WIRE_BUS  7  // port number used for data (yellow) (terminal of arduino nano D7) 
+#define  SENSER_BIT     9       // setting of accuracy bit 
+OneWire oneWire(ONE_WIRE_BUS); 
+DallasTemperature sensors(&oneWire);
+
+/////////////////////////////////////////////////////////////////////////////
+#define D1 5 // fan assigning the ESP8266 pin to arduino pin
+int fanPin = 5;
+////////////////////////////////////////////////////////////////////////////
+
+// variable definitions (thermometer) 
+float C_Temp = 0.0;  // current temperature 
+float P_Temp [159];  // past temperature (159 points min) 
+float Max_Temp = 0.0;  // maximum temperature 
+float Min_Temp = 99.0;  // Minimum temperature
+
+// For graph drawing 
+float T_intreval_Temp = 360000; 
+// Interval (millisecond) Example: 1000 * 60 * 6 = 360000 (0.1 hr = 6 min), 10000 (10 sec) 
+int Cur_time_Temp = 0;  // Current unit time (Current millisecond / interval) 
+int Old_time_Temp = 0;  // Increment when current unit time exceeds
+
+float T_intreval_pH = 360000;
+// interface - interval (in milliseconds) Example: 1000 * 60 * 6 = 360000 (= 0.1 hr 6min), 10000 (10 sec) 
+int Cur_time_pH = 0;  // current unit time (the current millisecond / Interval) 
+int Old_time_pH = 0;  // Increment when current unit time exceeds
+
+// Variable definition (for pH meter) 
+float Analog_In_raw = 0;  // Analog input from pH meter (raw) 
+int Analog_In = 0;  // Analog input from pH meter (average of 10 times) 
+float pH_A = 4.01;  // acid standard solution of pH 
+float pH_N = 6.86;  // neutral standard solution pH of 
+int Analog_A = 699;
+// acid standard solution ← ※ during calibration changing here. 
+// Reference: Connect from PC 723, Connect AC adapter 703 
+int Analog_N = 588;
+// Analog input of neutral standard solution 
+//Change this at the time of calibration. // Reference: 606 when connected from PC, 585 when AC adapter is connected 
+float Cal_Slope = 0.00;
+// slope of calibration curve: formula pH_Out = Cal_Slope * Analog_In + Cal_intercept 
+float Cal_Intercept = 0.00;  // intercept of calibration curve
+
+float C_pH = 0.0;  // pH output value (current pH) 
+int P_pH [159];  // past pH (159 points min) 
+float Max_pH = 0.0;  // best pH 
+float Min_pH = 99.0;  // Starting pH
+
+// Display mode setting 
+byte Disp_mode = 0;  // Display mode (0: temperature, 1: pH)
+
+// TFT prepared
+#include <TFT.h> // Arduino LCD library 
+#include <SPI.h> 
+#define cs   10
+#define dc   9
+#define rst  8 
+TFT TFTscreen = TFT(cs, dc, rst);
+char Char_C_Temp;  // Current character temperature 
+char Char_C_Temp_TFT[5];  // Current character temperature (for TFT display)
+
+char Char_Max_Temp;  // Maximum character temperature 
+char Char_Max_Temp_TFT[5];  // Maximum character temperature (for TFT display)
+
+char Char_Min_Temp;  // minimum character temperature 
+char Char_Min_Temp_TFT[5];  // minimum character temperature (for TFT display)
+
+char Char_C_pH;  // Current character pH 
+char Char_C_pH_TFT[5];  // Current character pH (for TFT display)
+
+char Char_Max_pH;  // Highest character pH 
+char Char_Max_pH_TFT[5];  // Highest character pH (for TFT display)
+
+char Char_Min_pH;  // Minimum character temperature 
+char Char_Min_pH_TFT[5];   // Minimum character pH (for TFT display)
+
+char Char_Analog_In;  // Analog input from pH meter (average of 10 times) 
+char Char_Analog_In_TFT[5];  // Analog input from pH meter (average of 10 times) (for TFT display)
+
+
+void setup(void) {
+  Serial.begin(9600);
+  sensors.setResolution(SENSER_BIT);
+  TFTscreen.begin();
+  TFTscreen.background(0, 0, 0);
+  
+  TFTscreen.stroke(255, 255, 255);
+  TFTscreen.setTextSize(1);
+  TFTscreen.text("          MERHABA",0,30);
+  TFTscreen.text(" Akvaryum Izleme Uygulamasi",0,70);
+  TFTscreen.text("      PH ve Sicaklik",0,90);
+  delay(5000);
+  TFTscreen.background(0, 0, 0);
+
+  pinMode(12,INPUT_PULLUP);  /// Set display mode switch to D12
+
+  /////////////////////////////////////////////////////////////////////////////////////////
+  pinMode(fanPin, OUTPUT); // sets the pins as outputs:
+  ////////////////////////////////////////////////////////////////////////////////////////
+  
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+void controlFanSpeed (int fanSpeedPercent) {
+//  Serial.print("Fan Speed: ");
+//  Serial.print(fanSpeedPercent);
+//  Serial.println("%");  
+//  analogWrite(fanPin, fanSpeedPercent); // set the fan speed
+//  digitalWrite(fanPin,HIGH); // turn the MOSFET Switch ON
+}
+///////////////////////////////////////////////////////////////////////////////////////
+ 
+void loop(void) {
+
+ if (Disp_mode != digitalRead(12)){
+    TFTscreen.background(0, 0, 0);
+   } // display mode is not changed, clear screen
+
+  Serial.print("Mode ");
+  Disp_mode = digitalRead(12);
+  Serial.println(Disp_mode);  // the current display mode of the serial output
+  
+// temperature acquisition 
+  sensors.requestTemperatures();     // temperature acquisition request 
+  C_Temp = sensors.getTempCByIndex(0);  // get the temperature
+  
+  /////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Map (change) the sensor reading of <=25 to >=35 to a value between 10 and 100
+//  int fanSpeedPercent = map(C_Temp, 25, 35, 10, 100);
+//  controlFanSpeed (fanSpeedPercent); // Update fan speed
+
+  if (C_Temp > 28)
+  {
+   digitalWrite(fanPin,HIGH); // turn the MOSFET Switch ON
+  }
+  else
+  {
+    digitalWrite(fanPin,LOW); // turn the MOSFET Switch ON
+  }
+  ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+   
+  //delay(1000);
+  Serial.print( "Temperature " );
+  Serial.println(C_Temp,1);  // serial transmission 
+  Serial.print(millis()/1000);  // Send elapsed time (seconds) 
+  Serial.println("sec");  
+  P_Temp [0] = C_Temp;
+
+  // pH of acquisition 
+  // pH cumulative 
+  Analog_In_raw  = 0;
+  for (int i=0; i<6000; i=i+1){
+  Analog_In_raw  = Analog_In_raw + analogRead( 0 );
+  delay(5);
+   }
+  Analog_In = Analog_In_raw / 6000;
+  Serial.print( "Sensor Value " );
+  Serial.println( Analog_In );
+
+  // pH of calculation 
+  Cal_Slope = ( pH_A - pH_N ) / ( Analog_A - Analog_N );
+  Serial.print( "Cal Slope " );
+  Serial.println( Cal_Slope );
+  Cal_Intercept = pH_N - Analog_N * Cal_Slope;
+  Serial.print( "Cal Intercept " );
+  Serial.println( Cal_Intercept );
+  float pHVol = Analog_In*5.0/1024;  
+  Serial.print( "pHVol " );
+  Serial.println( pHVol );
+  C_pH = -5.15 * pHVol + Cal_Intercept;
+  Serial.print( "pH " );
+  Serial.println( C_pH );
+  P_pH [0] = Analog_In;
+
+  // Temperature display routine (Draw to TFT if Disp_mode = 0) 
+  // Current temperature display 
+ if(Disp_mode == 0){
+  common_Screen_temp();
+    
+  TFTscreen.stroke(0, 0, 0);
+  TFTscreen.setTextSize(3);
+  TFTscreen.text(Char_C_Temp_TFT, 0, 5);
+
+  String Char_C_Temp = String(C_Temp);
+  Char_C_Temp.toCharArray(Char_C_Temp_TFT,5);
+
+  TFTscreen.stroke(255, 255, 255);
+  TFTscreen.setTextSize(3);
+  TFTscreen.text(Char_C_Temp_TFT, 0, 5);
+  delay(1000);
+ }
+
+  // maximum temperature display 
+  Serial.print(Max_Temp,1);  // serial transmission 
+  Serial.println("max temp");
+
+    // If the current temperature is above the maximum temperature, and below 80 ° C, 
+    // substitute the current temperature for the maximum temperature, and display the maximum temperature. (Less than 80 ° C. The exception error) 
+    if (Max_Temp < C_Temp & C_Temp < 80 ) {
+      Max_Temp = C_Temp;
+  }
+ if(Disp_mode == 0){
+      TFTscreen.stroke(0, 0, 0);
+      TFTscreen.setTextSize(2);
+      TFTscreen.text(Char_Max_Temp_TFT, 90, 0);
+    
+      String Char_Max_Temp = String(Max_Temp);
+      Char_Max_Temp.toCharArray(Char_Max_Temp_TFT,5);
+
+      TFTscreen.stroke(255, 0, 255);
+      TFTscreen.setTextSize(2);
+      TFTscreen.text(Char_Max_Temp_TFT, 90, 0);
+ }
+ 
+  // minimum temperature display 
+  Serial.print(Min_Temp,1);  // serial transmission 
+  Serial.println("min temp"); 
+
+    // If the current temperature is below the minimum temperature, and if it exceeds -100 ° C, 
+    // substitute the current temperature for the maximum temperature, and display the maximum temperature. (-100 ° C. above the the exception error) 
+    if (Min_Temp > C_Temp & C_Temp > -100) {
+      Min_Temp = C_Temp;
+  }
+   if(Disp_mode == 0){
+      TFTscreen.stroke(0, 0, 0);
+      TFTscreen.setTextSize(2);
+      TFTscreen.text(Char_Min_Temp_TFT, 90, 15);
+    
+      String Char_Min_Temp = String(Min_Temp);
+      Char_Min_Temp.toCharArray(Char_Min_Temp_TFT,5);
+
+      TFTscreen.stroke(255, 0, 0);
+      TFTscreen.setTextSize(2);
+      TFTscreen.text(Char_Min_Temp_TFT, 90, 15); 
+   }
+   
+  // Store the past temperature to the array every fixed time
+
+    Cur_time_Temp = millis()/T_intreval_Temp;
+    if(Old_time_Temp < Cur_time_Temp){
+    Old_time_Temp = Old_time_Temp + 1;
+
+  if(Disp_mode == 0){
+    TFTscreen.stroke(0, 0, 0);
+    for (int t=158; t >= 0; t=t-1){
+    TFTscreen.circle(159-t, P_Temp [t]*(-8.6)+299, 0);
+    TFTscreen.circle(159-t, P_Temp [t]*(-8.6)+299, 1);
+    TFTscreen.circle(159-t, P_Temp [t]*(-8.6)+299, 2);
+    }
+  }
+
+    for (int i=158; i >= 0; i=i-1){
+      P_Temp [i+1] = P_Temp [i];
+   }
+
+// charting 
+  if(Disp_mode == 0){
+   common_Screen_temp();
+   TFTscreen.stroke(0, 255, 0);
+   for (int t=158; t >= 0; t=t-1){
+   TFTscreen.circle(159-t, P_Temp [t]*(-8.6)+299, 1);
+  }
+ }
+} 
+
+ if(Disp_mode == 0){
+  
+  TFTscreen.stroke(255, 255, 0);
+  TFTscreen.setTextSize(1);
+  TFTscreen.text("pH", 0, 98);
+  
+// current pH Display (First Clear) 
+  TFTscreen.stroke(0, 0, 0);
+  TFTscreen.setTextSize(2);
+  TFTscreen.text(Char_C_pH_TFT, 22, 94);
+
+// (average of 10) the analog inputs from the pH meter display (first clear) 
+  TFTscreen.stroke(0, 0, 0);
+  TFTscreen.setTextSize(1);
+  TFTscreen.text(Char_Analog_In_TFT, 140, 118);
+
+// Current pH Display 
+  String Char_C_pH = String(C_pH);
+  Char_C_pH.toCharArray(Char_C_pH_TFT,5);
+
+  TFTscreen.stroke(255, 255, 0);
+  TFTscreen.setTextSize(2);
+  TFTscreen.text(Char_C_pH_TFT, 22, 94);
+
+  //// Analog input from pH meter (average of 10 times) Display 
+  String Char_Analog_In = String(Analog_In);
+  Char_Analog_In.toCharArray(Char_Analog_In_TFT,5);
+
+  TFTscreen.stroke(50, 50, 50);
+  TFTscreen.setTextSize(1);
+  TFTscreen.text(Char_Analog_In_TFT, 140, 118);
+ }
+
+  // pH display routine (draw to TFT if Disp_mode = 1) 
+  // current pH display 
+ if(Disp_mode == 1){
+  common_Screen_pH();
+    
+  TFTscreen.stroke(0, 0, 0);
+  TFTscreen.setTextSize(3);
+  TFTscreen.text(Char_C_pH_TFT, 14, 5);
+
+  String Char_C_pH = String(C_pH);
+  Char_C_pH.toCharArray(Char_C_pH_TFT,5);
+
+  TFTscreen.stroke(255, 255, 255);
+  TFTscreen.setTextSize(3);
+  TFTscreen.text(Char_C_pH_TFT, 14, 5);
+  delay(1000);
+}
+
+  // maximum pH display 
+  Serial.print(Max_pH,1);  // serial transmission 
+  Serial.println("max pH"); 
+
+    //If the current pH is above the maximum pH and less than 14, then the 
+    //current pH is substituted into the maximum pH and the maximum pH is displayed. 
+    if (Max_pH < C_pH & C_pH < 14 ) {
+      Max_pH = C_pH;
+  }
+ if(Disp_mode == 1){
+      TFTscreen.stroke(0, 0, 0);
+      TFTscreen.setTextSize(2);
+      TFTscreen.text(Char_Max_pH_TFT, 90, 0);
+    
+      String Char_Max_pH = String(Max_pH);
+      Char_Max_pH.toCharArray(Char_Max_pH_TFT,5);
+
+      TFTscreen.stroke(255, 0, 255);
+      TFTscreen.setTextSize(2);
+      TFTscreen.text(Char_Max_pH_TFT, 90, 0);
+ }
+
+  // Minimum pH display 
+  Serial.print(Min_pH,1);  // serial transmission 
+  Serial.println("min pH"); 
+
+    //If the current pH is below the lowest pH and above 1, 
+    //then the current pH is substituted for the lowest pH, and the lowest pH is displayed. 
+    if (Min_pH > C_pH & C_pH > 1) {
+      Min_pH = C_pH;
+  }
+   if(Disp_mode == 1){
+      TFTscreen.stroke(0, 0, 0);
+      TFTscreen.setTextSize(2);
+      TFTscreen.text(Char_Min_pH_TFT, 90, 15);
+    
+      String Char_Min_pH = String(Min_pH);
+      Char_Min_pH.toCharArray(Char_Min_pH_TFT,5);
+
+      TFTscreen.stroke(255, 0, 0);
+      TFTscreen.setTextSize(2);
+      TFTscreen.text(Char_Min_pH_TFT, 90, 15); 
+   }
+
+  // Store the past pH to the array every fixed time
+
+  Serial.print(P_pH[1]); // serial transmission 
+  Serial.println("P_pH"); 
+
+    Cur_time_pH = millis()/T_intreval_pH;
+    if(Old_time_pH < Cur_time_pH){
+    Old_time_pH = Old_time_pH + 1;
+
+ if(Disp_mode == 1){
+    TFTscreen.stroke(0, 0, 0);
+    for (int t=158; t >= 0; t=t-1){
+    float P_pH_Display = Cal_Slope * P_pH [t] + Cal_Intercept;
+      
+    TFTscreen.circle(159-t, P_pH_Display *(-28.7)+256, 0);
+    TFTscreen.circle(159-t, P_pH_Display *(-28.7)+256, 1);
+    TFTscreen.circle(159-t, P_pH_Display *(-28.7)+256, 2);
+    }
+  }
+
+    for (int i=158; i >= 0; i=i-1){
+      P_pH [i+1] = P_pH [i];
+   }
+
+// charting 
+ if(Disp_mode == 1){
+  common_Screen_pH();
+  TFTscreen.stroke(0, 255, 0);
+  for (int t=158; t >= 0; t=t-1){
+  float P_pH_Display = Cal_Slope * P_pH [t] + Cal_Intercept;
+  TFTscreen.circle(159-t, P_pH_Display *(-28.7)+256, 1);
+  }
+}
+} 
+// current temperature display 
+ if(Disp_mode == 1){
+  sensors.requestTemperatures();   // temperature acquisition request 
+  C_Temp = sensors.getTempCByIndex(0);  // Get the temperature
+  
+// current temperature display (first clear) 
+  TFTscreen.stroke(0, 0, 0);
+  TFTscreen.setTextSize(2);
+  TFTscreen.text(Char_C_Temp_TFT, 0, 52);
+
+// ° C. Display 
+  TFTscreen.stroke(255, 255, 0);
+  TFTscreen.setTextSize(1);
+  TFTscreen.text("C",56,59);
+  TFTscreen.circle(55, 55, 2);
+
+// current temperature display 
+  String Char_C_Temp = String(C_Temp);
+  Char_C_Temp.toCharArray(Char_C_Temp_TFT,5);
+
+  TFTscreen.stroke(255, 255, 0);
+  TFTscreen.setTextSize(2);
+  TFTscreen.text(Char_C_Temp_TFT, 0, 52);
+
+ }
+}
+
+// common screen display routine
+
+// temperature display 
+void common_Screen_temp(){
+  TFTscreen.stroke(255, 255, 255);
+  TFTscreen.setTextSize(1);
+  TFTscreen.text("C",76,19);
+  TFTscreen.circle(75, 15, 2);
+
+  TFTscreen.stroke(255, 0, 255);
+  TFTscreen.setTextSize(1);
+  TFTscreen.text("MAX",140,7);
+
+  TFTscreen.stroke(255, 0, 0);
+  TFTscreen.setTextSize(1);
+  TFTscreen.text("MIN",140,21);
+
+  TFTscreen.stroke(120, 120, 120);
+  TFTscreen.line(0, 41, 159, 41);
+  TFTscreen.text("30 c", 0, 32);
+  TFTscreen.circle(15, 34, 1);
+  
+  TFTscreen.line(0, 84, 159, 84);
+  TFTscreen.text("25 c", 0, 75);
+  TFTscreen.circle(15, 77, 1);
+
+  TFTscreen.line(0, 127, 159, 127);
+  TFTscreen.text("20 c", 0, 118);
+  TFTscreen.circle(15, 120, 1);
+
+  TFTscreen.text("-6hr", 100, 118);  // -6hr
+  TFTscreen.text("-12hr", 40, 118);  // -12hr
+  
+  TFTscreen.stroke(80, 80, 80);
+  TFTscreen.line(99, 40, 99, 127);
+  TFTscreen.line(39, 40, 39, 127);
+}
+
+// pH display 
+void common_Screen_pH(){ 
+  TFTscreen.stroke(255, 255, 255);
+  TFTscreen.setTextSize(1);
+  TFTscreen.text("p",0,0);
+  TFTscreen.text("H",4,10);
+
+  TFTscreen.stroke(255, 0, 255);
+  TFTscreen.setTextSize(1);
+  TFTscreen.text("MAX",140,7);
+
+  TFTscreen.stroke(255, 0, 0);
+  TFTscreen.setTextSize(1);
+  TFTscreen.text("MIN",140,21);
+
+  TFTscreen.stroke(120, 120, 120);
+  TFTscreen.line(0, 41, 159, 41);
+  TFTscreen.text("pH 7.5", 0, 32);
+  
+  TFTscreen.line(0, 84, 159, 84);
+  TFTscreen.text("pH 6.0", 0, 75);
+
+  TFTscreen.line(0, 127, 159, 127);
+  TFTscreen.text("pH 4.5", 0, 118);
+
+  TFTscreen.text("-6hr", 100, 118);  // -6hr
+  TFTscreen.text("-12hr", 40, 118);  // -12hr
+  
+  TFTscreen.stroke(80, 80, 80);
+  TFTscreen.line(99, 40, 99, 127);
+  TFTscreen.line(39, 40, 39, 127);
+  
+}
