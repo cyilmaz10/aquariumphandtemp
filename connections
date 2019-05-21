@@ -1,0 +1,29 @@
+ Arduino - TFT LCD
+　D8-RST　(1KΩ direnç ile）
+　D10-CS　(1KΩ direnç ile）
+　D9-D/C　(1KΩ direnç ile）
+　D11-DIN　(1KΩ direnç ile）
+　D13-CLK　(1KΩ direnç ile）
+　5V-VCC
+　5V-BL
+　GND - GND
+
+ Arduino - PH Sensor modul
+　A0   - PO(PH analog çıkış)
+　GND - GND
+　GND - GND
+　5V - VCC
+
+ Arduino - Sıcaklık Sensörü DS18B20
+　D7 - DQ 　(4.7kΩ ile）
+　GND - GND
+　5V - VCC
+
+ Arduino - Switch（ekran seçimi）
+　D12- pin1　（pin2）
+　GND - pin2　（pin1)
+
+ Arduino - MOS Modul（fan kontrolü）
+　D5 - DQ 　
+　GND - GND
+　5V - VCC
