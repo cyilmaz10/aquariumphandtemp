@@ -110,6 +110,7 @@ void controlFanSpeed (int fanSpeedPercent) {
 //  digitalWrite(fanPin,HIGH); // turn the MOSFET Switch ON
 }
 ///////////////////////////////////////////////////////////////////////////////////////
+
  
 void loop(void) {
 
@@ -146,15 +147,16 @@ void loop(void) {
   Serial.print(millis()/1000);  // Send elapsed time (seconds) 
   Serial.println("sec");  
   P_Temp [0] = C_Temp;
+  
 
   // pH of acquisition 
   // pH cumulative 
   Analog_In_raw  = 0;
-  for (int i=0; i<6000; i=i+1){
+  for (int i=0; i<200; i=i+1){
   Analog_In_raw  = Analog_In_raw + analogRead( 0 );
   delay(5);
-   }
-  Analog_In = Analog_In_raw / 6000;
+  }
+  Analog_In = Analog_In_raw / 220;
   Serial.print( "Sensor Value " );
   Serial.println( Analog_In );
 
@@ -236,8 +238,9 @@ void loop(void) {
    }
    
   // Store the past temperature to the array every fixed time
-
     Cur_time_Temp = millis()/T_intreval_Temp;
+   Serial.print("Cur_time_Temp ");
+   Serial.println(Cur_time_Temp);
     if(Old_time_Temp < Cur_time_Temp){
     Old_time_Temp = Old_time_Temp + 1;
 
@@ -253,16 +256,18 @@ void loop(void) {
     for (int i=158; i >= 0; i=i-1){
       P_Temp [i+1] = P_Temp [i];
    }
+}
 
 // charting 
   if(Disp_mode == 0){
    common_Screen_temp();
    TFTscreen.stroke(0, 255, 0);
    for (int t=158; t >= 0; t=t-1){
-   TFTscreen.circle(159-t, P_Temp [t]*(-8.6)+299, 1);
+   TFTscreen.circle(159-t, P_Temp [t]*(-8.6)+299, 1);  
+   //Serial.print("Chart Time ");
+   //Serial.println(P_Temp [t]);
   }
- }
-} 
+ } 
 
  if(Disp_mode == 0){
   
@@ -365,34 +370,41 @@ void loop(void) {
   Serial.println("P_pH"); 
 
     Cur_time_pH = millis()/T_intreval_pH;
+   Serial.print("Cur_time_pH ");
+   Serial.println(Cur_time_Temp);
     if(Old_time_pH < Cur_time_pH){
     Old_time_pH = Old_time_pH + 1;
 
  if(Disp_mode == 1){
     TFTscreen.stroke(0, 0, 0);
-    for (int t=158; t >= 0; t=t-1){
-    float P_pH_Display = Cal_Slope * P_pH [t] + Cal_Intercept;
+    for (int p=158; p >= 0; p=p-1){
+    float P_pH_Display = Cal_Slope * P_pH [p] + Cal_Intercept;
       
-    TFTscreen.circle(159-t, P_pH_Display *(-28.7)+256, 0);
-    TFTscreen.circle(159-t, P_pH_Display *(-28.7)+256, 1);
-    TFTscreen.circle(159-t, P_pH_Display *(-28.7)+256, 2);
+    TFTscreen.circle(159-p, P_pH_Display *(-28.7)+256, 0);
+    TFTscreen.circle(159-p, P_pH_Display *(-28.7)+256, 1);
+    TFTscreen.circle(159-p, P_pH_Display *(-28.7)+256, 2);
     }
   }
 
-    for (int i=158; i >= 0; i=i-1){
-      P_pH [i+1] = P_pH [i];
+    for (int j=158; j >= 0; j=j-1){
+      P_pH [j+1] = P_pH [j];
    }
+}
 
 // charting 
  if(Disp_mode == 1){
   common_Screen_pH();
   TFTscreen.stroke(0, 255, 0);
-  for (int t=158; t >= 0; t=t-1){
-  float P_pH_Display = Cal_Slope * P_pH [t] + Cal_Intercept;
-  TFTscreen.circle(159-t, P_pH_Display *(-28.7)+256, 1);
+  for (int p=158; p >= 0; p=p-1){
+  float P_pH_Display = Cal_Slope * P_pH [p] + Cal_Intercept;
+  TFTscreen.circle(159-p, P_pH_Display *(-28.7)+256, 1);  
+  //Serial.print("Chart PH ");
+  //Serial.println(P_pH_Display);
+  //Serial.print("P_pH ");
+  //Serial.println(P_pH [p]);  
   }
 }
-} 
+ 
 // current temperature display 
  if(Disp_mode == 1){
   sensors.requestTemperatures();   // temperature acquisition request 
